@@ -5,7 +5,8 @@ import re
 class TextGenerator(object):
     def __init__(self):
         self.tpl = ""
-        self.bufname = "[Result]"
+        self.bufname = "[Render Result]"
+        self.outwin = None
         self.outbuf = None
 
     def set_template(self, fl: int, ll: int):
@@ -26,35 +27,43 @@ class TextGenerator(object):
         if not self.tpl:
             self.tpl = b[fl - 1]
 
-        if not self.outbuf:
+        if not self.outwin and not self.outbuf:
             vim.command("new")
             self.outbuf = vim.current.buffer
             self.outbuf.name = self.bufname
-
             # setlocal buftype=nofile
             self.outbuf.options["buftype"] = "nofile"
             # setlocal nobuflisted
             self.outbuf.options["buflisted"] = False
+            # setlocal noswapfile
+            self.outbuf.options["swapfile"] = False
 
             # setlocal bufhidden=hide
-            # setlocal noswapfile
             # setlocal textwidth=0
-
             # setlocal nolist
             # setlocal nowrap
             # setlocal winfixwidth
             # setlocal nospell
-            vim.current.window.options["previewwindow"] = True
-            vim.command("call win_gotoid(%s)" % winnr)
 
+            self.outwin = vim.current.window
+            self.outwin.options["previewwindow"] = True
+
+        if not self.outwin.valid:
+            vim.command("sb %d" % self.outbuf.number)
+            self.outwin = vim.current.window
+            self.outwin.options["previewwindow"] = True
+            # setlocal buftype=nofile
+            self.outbuf.options["buftype"] = "nofile"
+
+        vim.command("call win_gotoid(%s)" % winnr)
         # setlocal nomodifiable
-        self.outbuf.options["modifiable"] = True
+        self.outwin.buffer.options["modifiable"] = True
 
         # clear outbuf
-        del self.outbuf[:]
+        del self.outwin.buffer[:]
 
         for d in data:
-            self.outbuf.append(
+            self.outwin.buffer.append(
                     (self.tpl.format(*tuple(d.split()))).splitlines(),
                     0)
-        self.outbuf.options["modifiable"] = False
+        self.outwin.buffer.options["modifiable"] = False
